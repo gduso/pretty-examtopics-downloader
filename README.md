@@ -7,13 +7,17 @@
   <a href="https://go.dev/">
     <img src="https://img.shields.io/badge/Built%20with-Go-blue?style=flat-square" alt="Built with Go">
   </a>
-  <a href="https://github.com/npapatheodorou/pretty-examtopics-downloader/releases/latest">
-    <img src="https://img.shields.io/github/v/release/npapatheodorou/pretty-examtopics-downloader?include_prereleases&label=Latest%20Release&style=flat-square" alt="Latest Release">
+  <a href="https://github.com/gduso/pretty-examtopics-downloader/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Latest%20Release-green?style=flat-square" alt="Latest Release">
   </a>
 </p>
 
 > **This project is a fork of [thatonecodes/examtopics-downloader](https://github.com/thatonecodes/examtopics-downloader)**  
 > Special thanks to [@thatonecodes](https://github.com/thatonecodes) for creating the original tool that made this possible.
+>
+> This copy is based on [npapatheodorou/pretty-examtopics-downloader](https://github.com/npapatheodorou/pretty-examtopics-downloader)
+> and adapted to the current ExamTopics page layout (absolute links, new discussion paging, inline answer
+> choices and comment-based community answers).
 
 ---
 
@@ -43,9 +47,22 @@ site access controls.
 
 ### Option 1: Use a Published .exe (Easiest)
 
-1. Go to the [Releases](https://github.com/npapatheodorou/pretty-examtopics-downloader/releases) page
+1. Go to the [Releases](https://github.com/gduso/pretty-examtopics-downloader/releases) page
 2. Download the latest `examtopics-downloader-windows-amd64.exe`
 3. Double-click to run - no installation needed!
+
+The .exe is not code-signed, so Windows SmartScreen may show "Windows protected your PC" the first
+time. Click **More info** and then **Run anyway**.
+
+Large providers such as Microsoft (~1,500 discussion pages) and Amazon (~600) need a long first
+discovery scan, because ExamTopics rate-limits requests. A double-click run scans for 2 minutes and
+saves a `.partial.html`. To finish in one go, open PowerShell in the folder with the .exe and run:
+
+```powershell
+.\examtopics-downloader-windows-amd64.exe -scan-minutes 90
+```
+
+Scanned pages are cached, so later runs for the same provider are fast.
 
 Published releases can lag the current source branch. Check the release date and
 notes; build from source when you need changes that have not been released yet.
@@ -55,7 +72,7 @@ notes; build from source when you need changes that have not been released yet.
 If you have [Go installed](https://go.dev/dl/):
 
 ```bash
-git clone https://github.com/npapatheodorou/pretty-examtopics-downloader.git
+git clone https://github.com/gduso/pretty-examtopics-downloader.git
 cd pretty-examtopics-downloader
 go build -o examtopics-downloader.exe ./cmd
 ```
