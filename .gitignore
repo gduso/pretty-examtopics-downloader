@@ -14,6 +14,7 @@ examtopics_output.pdf
 # Keep project documentation trackable.
 !README.md
 !PROJECT_OVERVIEW.md
+!COMO-USAR.md
 
 # Environment
 env/
