@@ -324,6 +324,7 @@ GOOS=darwin GOARCH=amd64 go build -o examtopics-downloader ./cmd
 -no-cache                 Bypass both provider-index and question-page caches
 -refresh-index            Rebuild the provider discussion index but keep question pages cached
 -recent-comments-days N   Filter by recent dated comments; unknown dates remain (0 disables)
+-scan-minutes N           Minutes per discussion-discovery pass (default 2); later runs resume from cache
 -h, --help, /?            Show command-line and interactive-command help
 ```
 

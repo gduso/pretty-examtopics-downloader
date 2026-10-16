@@ -57,6 +57,18 @@ func reportProgress(report ProgressFunc, progress Progress) {
 	}
 }
 
+// discoveryTimeout bounds one discussion-index scan pass when the caller does
+// not set IndexOptions.Timeout.
+var discoveryTimeout = constants.DiscoveryTimeout
+
+// SetDiscoveryTimeout overrides the length of a discussion-index scan pass.
+// Non-positive values keep the default.
+func SetDiscoveryTimeout(d time.Duration) {
+	if d > 0 {
+		discoveryTimeout = d
+	}
+}
+
 // GetProviderDiscussionIndex returns a reusable provider-wide discussion-link
 // index. Complete cache entries return immediately; partial entries resume only
 // pages that were not checkpointed successfully.
@@ -69,7 +81,7 @@ func GetProviderDiscussionIndex(ctx context.Context, provider string, options In
 		ctx = context.Background()
 	}
 	if options.Timeout <= 0 {
-		options.Timeout = constants.DiscoveryTimeout
+		options.Timeout = discoveryTimeout
 	}
 	if options.Workers <= 0 {
 		options.Workers = constants.DiscoveryWorkers

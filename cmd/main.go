@@ -57,9 +57,11 @@ func run() error {
 	noCache := flag.Bool("no-cache", false, "Bypass provider-index and question-page caches (always fetch fresh)")
 	refreshIndex := flag.Bool("refresh-index", false, "Force a fresh provider discussion index while retaining question-page cache entries")
 	recentDays := flag.Int("recent-comments-days", 0, "Filter by dated comment activity in the last N days; unknown dates remain")
+	scanMinutes := flag.Int("scan-minutes", 2, "Minutes per discussion-discovery pass; later runs resume from cache")
 	flag.Parse()
 	fetch.SetDebug(*debug)
 	fetch.SetCacheEnabled(!*noCache)
+	fetch.SetDiscoveryTimeout(time.Duration(*scanMinutes) * time.Minute)
 
 	// Distinguish "flag explicitly passed" from "left at default 0" so we only
 	// fall back to the interactive prompt when the user didn't specify a window.
@@ -170,6 +172,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  -refresh-index            Rebuild the provider index; retain question cache")
 	fmt.Fprintln(w, "  -recent-comments-days N   Filter by recent dated comments; unknown dates remain")
 	fmt.Fprintln(w, "                             Use 0 to disable the filter")
+	fmt.Fprintln(w, "  -scan-minutes N           Minutes per discussion-discovery pass (default 2)")
 	fmt.Fprintln(w, "  -h, --help, /?            Show this help and exit")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Interactive exam commands:")
@@ -177,7 +180,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  1           Select displayed item 1")
 	fmt.Fprintln(w, "  /clear      Show the full list again")
 	fmt.Fprintln(w, "  /reload     Reload official exams")
-	fmt.Fprintln(w, "  /scan       Resume public discussion discovery (two-minute pass)")
+	fmt.Fprintln(w, "  /scan       Resume public discussion discovery (one -scan-minutes pass)")
 	fmt.Fprintln(w, "  /all        Download indexed public provider discussions (may be partial)")
 	fmt.Fprintln(w, "Enter one item at a time, then press Enter.")
 }
@@ -607,7 +610,7 @@ func printExamMenuHelp() {
 	fmt.Println(style("   1           Select displayed item 1", ansiGray))
 	fmt.Println(style("   /clear      Show the full exam list again", ansiGray))
 	fmt.Println(style("   /reload     Fetch the official exam list again", ansiGray))
-	fmt.Println(style("   /scan       Find more exams from discussions (up to 2 minutes)", ansiGray))
+	fmt.Println(style("   /scan       Find more exams from discussions (one -scan-minutes pass)", ansiGray))
 	fmt.Println(style("   /all        Download every indexed public discussion for this provider", ansiGray))
 }
 
