@@ -19,6 +19,8 @@
 > and adapted to the current ExamTopics page layout (absolute links, new discussion paging, inline answer
 > choices and comment-based community answers).
 
+**🇧🇷 Guia rápido em português (Windows e WSL): [COMO-USAR.md](COMO-USAR.md)**
+
 ---
 
 ## What is this?
