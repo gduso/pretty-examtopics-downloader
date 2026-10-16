@@ -33,6 +33,55 @@ func TestExtractProvidersFromExamsDoc(t *testing.T) {
 	}
 }
 
+func TestExtractProvidersFromExamsDocAbsoluteLinks(t *testing.T) {
+	html := `
+<div>
+  <a href="https://www.examtopics.com/exams/">All</a>
+  <a href="https://www.examtopics.com/exams/amazon/">Amazon</a>
+  <a href="https://www.examtopics.com/exams/cisco/">Cisco</a>
+  <a href="https://example.com/exams/oracle/">ignore</a>
+  <a href="https://www.examtopics.com/discussions/cisco/">ignore</a>
+</div>`
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		t.Fatalf("failed to parse html: %v", err)
+	}
+
+	got := extractProvidersFromExamsDoc(doc)
+	want := []string{"amazon", "cisco"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d providers, got %d (%v)", len(want), len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected provider at index %d: want %q, got %q", i, want[i], got[i])
+		}
+	}
+}
+
+func TestExtractProvidersFromDiscussionsDocAbsoluteLinks(t *testing.T) {
+	html := `
+<div class="discussion-row">
+  <a class="discussion-link" href="https://www.examtopics.com/discussions/amazon/">Amazon</a>
+  <div class="discussion-stats-replies">42<br/>Discussions</div>
+</div>
+<div class="discussion-row">
+  <a class="discussion-link" href="https://www.examtopics.com/discussions/empty/">Empty</a>
+  <div class="discussion-stats-replies">0<br/>Discussions</div>
+</div>`
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		t.Fatalf("failed to parse html: %v", err)
+	}
+
+	got := extractProvidersFromDiscussionsDoc(doc)
+	if len(got) != 1 || got[0] != "amazon" {
+		t.Fatalf("expected [amazon], got %v", got)
+	}
+}
+
 func TestExtractProvidersFromDiscussionsDocPositiveCountsOnly(t *testing.T) {
 	html := `
 <div class="discussion-row">

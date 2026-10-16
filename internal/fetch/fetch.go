@@ -415,7 +415,7 @@ func extractProvidersFromExamsDoc(doc *goquery.Document) []string {
 			return
 		}
 
-		href = strings.TrimSpace(strings.ToLower(href))
+		href = siteRelativeHref(href)
 		matches := providerHrefPattern.FindStringSubmatch(href)
 		if len(matches) != 2 {
 			return
@@ -461,7 +461,7 @@ func extractProvidersFromDiscussionsDoc(doc *goquery.Document) []string {
 				return true
 			}
 
-			href = strings.TrimSpace(strings.ToLower(href))
+			href = siteRelativeHref(href)
 			matches := discussionProviderHrefPattern.FindStringSubmatch(href)
 			if len(matches) != 2 {
 				return true
@@ -496,7 +496,7 @@ func extractProvidersFromDiscussionsDoc(doc *goquery.Document) []string {
 				return
 			}
 
-			href = strings.TrimSpace(strings.ToLower(href))
+			href = siteRelativeHref(href)
 			matches := discussionProviderHrefPattern.FindStringSubmatch(href)
 			if len(matches) != 2 {
 				return
@@ -571,7 +571,7 @@ func getProviderExamsContext(ctx context.Context, providerName string) ([]string
 			return
 		}
 
-		cleanHref := strings.TrimSpace(strings.ToLower(href))
+		cleanHref := siteRelativeHref(href)
 		matches := examHrefPattern.FindStringSubmatch(cleanHref)
 		if len(matches) != 2 {
 			return
@@ -863,6 +863,30 @@ func normalizeDiscussionViewHref(rawHref string) string {
 	}
 
 	return rawHref
+}
+
+// siteRelativeHref lowercases an href and strips the ExamTopics scheme and
+// host, so absolute links ("https://www.examtopics.com/exams/amazon/") match the
+// same path patterns as relative ones ("/exams/amazon/"). Links to other hosts
+// are returned unchanged and therefore never match those patterns.
+func siteRelativeHref(rawHref string) string {
+	rawHref = strings.TrimSpace(strings.ToLower(rawHref))
+	if !strings.HasPrefix(rawHref, "https://") && !strings.HasPrefix(rawHref, "http://") && !strings.HasPrefix(rawHref, "//") {
+		return rawHref
+	}
+
+	parsed, err := url.Parse(rawHref)
+	if err != nil {
+		return rawHref
+	}
+	host := parsed.Hostname()
+	if host != "www.examtopics.com" && host != "examtopics.com" {
+		return rawHref
+	}
+	if parsed.EscapedPath() == "" {
+		return "/"
+	}
+	return parsed.EscapedPath()
 }
 
 func matchesExamSelection(providerName, selectedExam, link string) bool {

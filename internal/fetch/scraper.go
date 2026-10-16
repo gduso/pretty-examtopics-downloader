@@ -37,6 +37,14 @@ func getDataFromLinkContext(ctx context.Context, link string, solutions map[stri
 	}
 
 	allQuestions := extractAnswerOptions(doc)
+	content := utils.CleanText(doc.Find(".card-text").Text())
+	if len(allQuestions) == 0 {
+		if stem, inline, ok := extractInlineOptions(doc); ok {
+			allQuestions = inline
+			content = stem
+		}
+	}
+	comments := extractDiscussionComments(doc)
 
 	answer := strings.TrimSpace(doc.Find(".correct-answer").Text())
 	if answer == "" {
@@ -88,6 +96,15 @@ func getDataFromLinkContext(ctx context.Context, link string, solutions map[stri
 		}
 	}
 
+	// Discussion pages no longer embed the vote tally, so the answers picked
+	// in the comments' "Selected Answer" badges are the remaining community
+	// signal.
+	if answer == "" {
+		if voted := mostSelectedCommentAnswer(comments); voted != "" {
+			answer = "Correct: " + voted
+		}
+	}
+
 	questionExhibits, answerExhibits := extractQuestionAndAnswerExhibits(doc)
 
 	// The .question-body wrapper carries a stable numeric data-id that we
@@ -105,7 +122,7 @@ func getDataFromLinkContext(ctx context.Context, link string, solutions map[stri
 	return &models.QuestionData{
 		Title:             utils.CleanText(doc.Find("h1").Text()),
 		Header:            strings.ReplaceAll(strings.TrimSpace(doc.Find(".question-discussion-header").Text()), "\t", ""),
-		Content:           utils.CleanText(doc.Find(".card-text").Text()),
+		Content:           content,
 		ExhibitURLs:       questionExhibits,
 		AnswerExhibitURLs: answerExhibits,
 		Questions:         allQuestions,
@@ -113,7 +130,7 @@ func getDataFromLinkContext(ctx context.Context, link string, solutions map[stri
 		Timestamp:         utils.CleanText(doc.Find(".discussion-meta-data > i").Text()),
 		QuestionLink:      link,
 		QuestionID:        questionID,
-		Comments:          extractDiscussionComments(doc),
+		Comments:          comments,
 		Solution:          solution,
 	}, fromCache, metrics.Retries, nil
 }
@@ -148,6 +165,67 @@ func extractAnswerOptions(doc *goquery.Document) []string {
 		}
 	}
 	return nil
+}
+
+// inlineOptionPattern matches one choice in the current discussion-page
+// layout, where choices are plain "A. text" segments between <br> tags inside
+// .card-text instead of li.multi-choice-item elements.
+var inlineOptionPattern = regexp.MustCompile(`^([A-F])\.\s+(\S.*)$`)
+
+// extractInlineOptions splits the question card on <br> and returns the stem
+// (the text before the first choice) and the choices as "A. text" lines. The
+// choices are the trailing run lettered consecutively from the last segment
+// that starts with "A.", so an earlier sentence starting with "A." stays in
+// the stem; any other segment inside the run continues the choice before it.
+func extractInlineOptions(doc *goquery.Document) (string, []string, bool) {
+	card := doc.Find(".question-body .card-text").First()
+	if card.Length() == 0 {
+		return "", nil, false
+	}
+
+	var segments []string
+	var current strings.Builder
+	flush := func() {
+		if segment := strings.Join(strings.Fields(current.String()), " "); segment != "" {
+			segments = append(segments, segment)
+		}
+		current.Reset()
+	}
+	card.Contents().Each(func(_ int, s *goquery.Selection) {
+		if goquery.NodeName(s) == "br" {
+			flush()
+			return
+		}
+		current.WriteString(s.Text())
+	})
+	flush()
+
+	first := -1
+	for i := len(segments) - 1; i >= 0; i-- {
+		if m := inlineOptionPattern.FindStringSubmatch(segments[i]); m != nil && m[1] == "A" {
+			first = i
+			break
+		}
+	}
+	if first < 0 {
+		return "", nil, false
+	}
+
+	var options []string
+	next := byte('A')
+	for _, segment := range segments[first:] {
+		if m := inlineOptionPattern.FindStringSubmatch(segment); m != nil && m[1][0] == next {
+			options = append(options, m[1]+". "+m[2])
+			next++
+			continue
+		}
+		options[len(options)-1] += " " + segment
+	}
+	if len(options) < 2 {
+		return "", nil, false
+	}
+
+	return strings.Join(segments[:first], "\n"), options, true
 }
 
 // extractOptionLine builds a single option string from one option <li>/<div>.
@@ -416,6 +494,27 @@ func extractMostVotedAnswer(doc *goquery.Document) string {
 
 var commentAnswerLetterPattern = regexp.MustCompile(`\b([A-F])\b`)
 
+// commentAnswerLettersPattern matches a bare answer such as "D" or "BD".
+var commentAnswerLettersPattern = regexp.MustCompile(`^[A-F]{1,6}$`)
+
+// mostSelectedCommentAnswer returns the answer picked most often in the
+// comments' "Selected Answer" badges; a tie goes to the answer that reached
+// the top count first.
+func mostSelectedCommentAnswer(comments []models.CommentData) string {
+	counts := map[string]int{}
+	best, bestCount := "", 0
+	for _, c := range comments {
+		if c.Answer == "" {
+			continue
+		}
+		counts[c.Answer]++
+		if counts[c.Answer] > bestCount {
+			best, bestCount = c.Answer, counts[c.Answer]
+		}
+	}
+	return best
+}
+
 // commentDateLayout matches the absolute timestamp ExamTopics stores in the
 // title attribute of .comment-date, e.g. "Tue 27 Jun 2023 10:27". The visible
 // text is a relative string ("2 years ago") and is intentionally not parsed.
@@ -455,7 +554,19 @@ func extractDiscussionComments(doc *goquery.Document) []models.CommentData {
 		if answerText == "" {
 			answerText = strings.TrimSpace(s.Find(".comment-selected-answers").First().Text())
 		}
-		if m := commentAnswerLetterPattern.FindStringSubmatch(strings.ToUpper(answerText)); len(m) == 2 {
+		if answerText == "" {
+			// Current markup: <div class="badge">Selected Answer: <span><strong>BD</strong></span></div>
+			s.Find(".comment-body .badge").EachWithBreak(func(_ int, badge *goquery.Selection) bool {
+				if !strings.Contains(strings.ToLower(badge.Text()), "selected answer") {
+					return true
+				}
+				answerText = strings.TrimSpace(badge.Find("strong").First().Text())
+				return false
+			})
+		}
+		if letters := strings.ToUpper(answerText); commentAnswerLettersPattern.MatchString(letters) {
+			answer = letters
+		} else if m := commentAnswerLetterPattern.FindStringSubmatch(letters); len(m) == 2 {
 			answer = m[1]
 		}
 
@@ -497,7 +608,8 @@ func normalizeCommentText(raw string) string {
 }
 
 func listingPageURL(providerName string, page int) string {
-	return fmt.Sprintf("%s/discussions/%s/%d", examTopicsBaseURL, providerName, page)
+	// ExamTopics 404s listing pages without the trailing slash.
+	return fmt.Sprintf("%s/discussions/%s/%d/", examTopicsBaseURL, providerName, page)
 }
 
 func questionPageURL(link string) string {

@@ -169,7 +169,7 @@ func TestWantsHelpRecognizesWindowsAndStandardForms(t *testing.T) {
 func TestPrintUsageDocumentsOptionsAndInteractiveCommands(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
-	for _, expected := range []string{"Usage:", "-no-cache", "-refresh-index", "-recent-comments-days", "unknown dates remain", "/clear", "/reload", "/scan", "two-minute pass", "/all", "may be partial", "Enter one item at a time"} {
+	for _, expected := range []string{"Usage:", "-no-cache", "-refresh-index", "-recent-comments-days", "unknown dates remain", "/clear", "/reload", "/scan", "-scan-minutes", "one -scan-minutes pass", "/all", "may be partial", "Enter one item at a time"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("help output does not contain %q", expected)
 		}
